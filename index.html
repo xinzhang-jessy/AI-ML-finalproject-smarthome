@@ -1,0 +1,229 @@
+
+ <!-- DIGF Intro of AI and ML 
+Final ML Project: Online Smart Home
+By Jessy(Xin Zhang)
+This project is based on the example of Teachable machine,W3 school
+The sound models traided on Teachableb Mchine
+Music resourse is adapted from the FreeSound https://freesound.org/ -->
+
+
+
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+<link href='https://fonts.googleapis.com/css?family=Architects Daughter' rel='stylesheet'>
+</head>
+<body onload='on()' style='position: relative;'>
+
+<style>
+    #overlay {
+      position: absolute;
+      display: none;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 2;
+      cursor: pointer;
+    }
+
+    body {
+    font-family: 'Architects Daughter';font-size: 22px;
+    }
+    </style>
+<script type="text/javascript">
+let started = false;
+function on() {
+  document.getElementById("overlay").style.display = "block";
+}
+
+function off() {
+  document.getElementById("overlay").style.display = "none";
+}
+
+function initOnce(){
+  if (started == false){
+    started = true;
+    document.getElementById('hint').innerHTML = 'Initializing ...'
+    init();
+  }
+}
+</script>
+
+
+<div id="label-container"></div>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.4.0/dist/speech-commands.min.js"></script>
+
+<div id="overlay" onclick="initOnce()" style="text-align: center">
+    <div id="hint" style='margin-top: 500px; font-size:24px; font-weight: bold; color:white'>
+      Welcome to Jessy's Smart Home <br/>
+      Enter</div>
+  </div>
+<div style="width:100%; display:flex; justify-content: center;">
+  <img id="myImg" src="img/light-music-off.png" style="width:100%"></img>
+</div>
+
+
+<div style="display:none">
+    <img src="img/light-on.png"></img>
+    <img src="img/music-on.png"></img>
+    <img src="img/light-music-on.png"></img>
+</div>
+
+<audio id="player1" loop>
+  <source src="music/music1.mp3"/>
+</audio>
+
+<audio id="player2" loop>
+    <source src="music/music2.mp3"/>
+</audio>
+<script type="text/javascript">
+  let lightOn = false;
+  let musicOn = false;
+  let trackNum = 0;
+  let trackChangedAt = 0;
+
+  function playMusic(){
+    trackNum = trackNum % 2;
+
+    if (trackNum == 0){
+      console.log('play track #0')
+      document.getElementById('player2').pause();
+      document.getElementById('player1').play();
+    }else{
+      console.log('play track #1')
+      document.getElementById('player1').pause();
+      document.getElementById('player2').play();
+    }
+  }
+  function stopMusic(){
+    document.getElementById('player1').pause();
+    document.getElementById('player2').pause();
+  }
+
+  function updateImage(){
+    if (lightOn && musicOn){
+      document.getElementById('myImg').setAttribute('src','img/light-music-on.png');
+      console.log('use light-music-on');
+      return;
+    }
+    if (lightOn && !musicOn){
+      document.getElementById('myImg').setAttribute('src','img/light-on.png');
+      console.log('use light-on');
+      return;
+    }
+    if (!lightOn && musicOn){
+      document.getElementById('myImg').setAttribute('src','img/music-on.png');
+      console.log('use music-on');
+      return;
+    }
+    if (!lightOn && !musicOn){
+      document.getElementById('myImg').setAttribute('src','img/light-music-off.png');
+      console.log('use light-music-off');
+      return;
+    }
+  }
+
+  // the link to your model provided by Teachable Machine export panel
+  const URL = "https://i4l8c.csb.app/";
+  async function createModel() {
+    const checkpointURL = URL + "model.json"; // model topology
+    const metadataURL = URL + "metadata.json"; // model metadata
+
+    const recognizer = speechCommands.create(
+      "BROWSER_FFT", // fourier transform type, not useful to change
+      undefined, // speech commands vocabulary feature, not useful for your models
+      checkpointURL,
+      metadataURL
+    );
+    // check that model and metadata are loaded via HTTPS requests.
+    await recognizer.ensureModelLoaded();
+
+    return recognizer;
+  }
+
+  async function init() {
+    const recognizer = await createModel();
+    const classLabels = recognizer.wordLabels(); // get class labels
+    const labelContainer = document.getElementById("label-container");
+    for (let i = 0; i < classLabels.length; i++) {
+      // labelContainer.appendChild(document.createElement("div"));
+    }
+
+    // listen() takes two arguments:
+    // 1. A callback function that is invoked anytime a word is recognized.
+    // 2. A configuration object with adjustable fields
+    recognizer.listen(
+      (result) => {
+        const scores = result.scores; // probability of prediction for each class
+        // render the probability scores per class
+        let max = 0;
+        let move = '';
+        for (let i = 0; i < classLabels.length; i++) {
+          const classPrediction =
+            classLabels[i] + ": " + result.scores[i].toFixed(2);
+          // labelContainer.childNodes[i].innerHTML = classPrediction;
+          if (result.scores[i]> max){
+            move = classLabels[i];
+            max = result.scores[i];
+          }
+        }
+
+
+        if (max < 0.85){
+          return;
+        }
+        
+        // if (move != 'Background Noise'){
+        //   console.log('Best choice:', move, 'with prob of ', max);
+        // }
+
+        if (move == 'light-on' && !lightOn){
+          console.log('LIGHT ON');
+          lightOn = true;
+          updateImage();
+        }
+        if (move == 'light-off' && lightOn){
+          console.log('LIGHT OFF');
+          lightOn = false;
+          updateImage();
+        }
+        if (move == 'music-on' && !musicOn){
+          console.log('MUSIC ON');
+          musicOn = true;
+          playMusic();
+          updateImage();
+        }
+        if (move == 'music-off' && musicOn){
+          console.log('MUSIC OFF');
+          musicOn = false;
+          stopMusic();
+          updateImage();
+        }
+        if (move == 'next' && musicOn){
+          console.log("NEXT SONG");
+          trackChangedAt = Date.now();
+          trackNum ++;
+          playMusic();
+        }
+      },
+      {
+        includeSpectrogram: true, // in case listen should return result.spectrogram
+        probabilityThreshold: 0.75,
+        invokeCallbackOnNoiseAndUnknown: true,
+        overlapFactor: 0.5 // probably want between 0.5 and 0.75. More info in README
+      }
+    );
+
+    // Stop the recognition in 5 seconds.
+    // setTimeout(() => recognizer.stopListening(), 5000);
+
+    off()
+  }
+</script>
+</body>
+</html>
